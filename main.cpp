@@ -234,7 +234,7 @@ Timer miTimer; //!< Timer general
 
 Ticker timerGeneral;
 
-uint8_t buttonIndex;
+uint8_t buttonIndex,flanco;
 /*****************************************************************************************************/
 /************  Función Principal ***********************/
 
@@ -313,7 +313,11 @@ void actuallizaMef(uint8_t indice){
             ourButton[indice].timeDown=miTimer.read_ms();
             ourButton[indice].estado=BUTTON_DOWN;
             //Flanco de bajada armo el protocolo para button event 
+            datosComProtocol.payload[1]=BUTTONEVENT;
             buttonIndex=indice;
+            myWord.ui32=ourButton[indice].timeDown;            
+            flanco=BUTTON_FALLING;
+            decodeData();
         }
         else
             ourButton[indice].estado=BUTTON_UP;    
@@ -323,8 +327,13 @@ void actuallizaMef(uint8_t indice){
         if(ourButton[indice].event){
             ourButton[indice].estado=BUTTON_UP;
             //Flanco de Subida
-            ourButton[indice].timeDiff=miTimer.read_ms()-ourButton[indice].timeDown;
-            togleLed(indice);
+            ourButton[indice].timeDiff=miTimer.read_ms();//-ourButton[indice].timeDown;
+            
+            datosComProtocol.payload[1]=BUTTONEVENT;
+            buttonIndex=indice;
+            myWord.ui32=ourButton[indice].timeDiff;            
+            flanco=BUTTON_RISING;
+            decodeData();
         }
 
         else
@@ -481,18 +490,25 @@ void decodeData(void)
             auxBuffTx[NBYTES]=0x03;
             break;
         case GET_LEDS:
+            
             auxBuffTx[indiceAux++]=GET_LEDS;
             myWord.ui16[0]=leds;
             auxBuffTx[indiceAux++]=myWord.ui8[0];
             auxBuffTx[indiceAux++]=myWord.ui8[1];
             auxBuffTx[NBYTES]=0x04;
+            
             break;
         case SET_LEDS:
             auxBuffTx[indiceAux++]=SET_LEDS;
             myWord.ui8[0]=datosComProtocol.payload[2];
             myWord.ui8[1]=datosComProtocol.payload[3];
-            auxBuffTx[NBYTES]=0x02;
+           
             ledsTask(datosComProtocol.payload[2],datosComProtocol.payload[3]);
+            
+            myWord.ui16[0]=leds;
+            auxBuffTx[indiceAux++]=myWord.ui8[0];
+            auxBuffTx[indiceAux++]=myWord.ui8[1];
+            auxBuffTx[NBYTES]=0x04; 
             //manejadorLed(myWord.ui16[0]);
             break;
         case GET_BUTTONS: //cambiar por el nombre del comando que se quiera agregar
@@ -505,9 +521,8 @@ void decodeData(void)
         case BUTTONEVENT: //cambiar por el nombre del comando que se quiera agregar
             auxBuffTx[indiceAux++]=BUTTONEVENT; //ID 
             auxBuffTx[indiceAux++]=buttonIndex;//boton que se presiono 
-            auxBuffTx[indiceAux++]=BUTTON_FALLING;//flanco 
-            myWord.ui32=ourButton->timeDown; //mando el tiempo que esta presionado 
-            
+            auxBuffTx[indiceAux++]=flanco;//flanco 
+            //mando el tiempo que esta presionado           
             auxBuffTx[indiceAux++]=myWord.ui8[0];
             auxBuffTx[indiceAux++]=myWord.ui8[1];
             auxBuffTx[indiceAux++]=myWord.ui8[2];
